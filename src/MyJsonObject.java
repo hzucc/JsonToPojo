@@ -1,8 +1,3 @@
-/*
- *@author ChenCheng
- *@date 2019/11/10
- */
-
 
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
@@ -103,18 +98,6 @@ public class MyJsonObject {
         }
     }
 
-    public class NotSupportedObjectArrayException extends Exception {
-        public NotSupportedObjectArrayException(String message) {
-            super(message);
-        }
-    }
-
-    public class NotMemberException extends Exception {
-        public NotMemberException(String message) {
-            super(message);
-        }
-    }
-
     public class NotSupportTypeException extends Exception {
         public NotSupportTypeException(String message) {
             super(message);
@@ -142,7 +125,8 @@ public class MyJsonObject {
         ++curent;
         int begin = curent;
         while (curent < beiGaoChars.length &&
-                beiGaoChars[curent] != '\"') {
+                !(beiGaoChars[curent] == '\"' &&
+                        beiGaoChars[curent - 1] != '\\')) {
             ++curent;
         }
         if (curent < beiGaoChars.length &&
@@ -152,7 +136,14 @@ public class MyJsonObject {
             ++curent;
             return String.valueOf(beiGaoChars, begin, end - begin);
         } else {
+            int start = Math.max(0, curent - 20);
+            int count = Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[count - start];
+            Arrays.fill(chars, ' ');
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, count) + "\n" +
+                    str + "^\n" +
                     "message:在解析JSON中的一个字符串时，发现它没有以\"结尾\n");
         }
     }
@@ -171,7 +162,14 @@ public class MyJsonObject {
             ++curent;
         }
         if (curent == beiGaoChars.length) {
+            int start = Math.max(0, curent - 20);
+            int count = Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars= new char[curent - start];
+            Arrays.fill(chars, ' ');
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, curent) + "\n" +
+                    str + "^\n" +
                     "message:在解析JSON中的一对键值对（key：value）中的值value完毕时，缺少一些JSON结尾标志字符，比如']'或'}'。\n");
         } else {
             int end = curent;
@@ -183,7 +181,14 @@ public class MyJsonObject {
                 Method method = bigDecimalTo.get(tClass);
                 obj = method.invoke(bigDecimal);
             } else {
+                int start = Math.max(0, curent - 20);
+                int count = Math.min(40, beiGaoChars.length - curent + 5);
+                char[] chars = new char[curent - start];
+                Arrays.fill(chars, ' ');
+                String str = String.valueOf(chars);
                 throw new NotSupportedNumberTypeException("index:" + curent + "\n" +
+                        String.valueOf(beiGaoChars, start, count) + "\n" +
+                        str + "^\n" +
                         "message:在解析一个JSON中的键值对（key：value）中的值value时，不能将BigDecimal转换为" + tClass.getName() + "类型\n");
             }
             return obj;
@@ -204,7 +209,14 @@ public class MyJsonObject {
             curent += 5;
             return false;
         } else {
+            int start = Math.max(0, curent - 20);
+            int count = Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[curent - start];
+            Arrays.fill(chars, ' ');
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, count) + "\n" +
+                    str + "^\n" +
                     "message:在解析一个JSON中的逻辑类型完毕时，发现JSON也被解析完毕了，缺少']'或'}'结尾。");
         }
     }
@@ -218,11 +230,25 @@ public class MyJsonObject {
                 String.valueOf(beiGaoChars, curent, 3).equals("null")) {
             curent += 4;
             if (curent >= beiGaoChars.length) {
+                int start = Math.max(0, curent - 20);
+                int count = Math.min(40, beiGaoChars.length - curent + 5);
+                char[] chars = new char[curent - start];
+                Arrays.fill(chars, ' ');
+                String str = String.valueOf(chars);
                 throw new JsonFormatException("index:" + curent + "\n" +
+                        String.valueOf(beiGaoChars, start, count) + "\n" +
+                        str + "^\n" +
                         "message:在解析完一个JSON中的一个null时，发现JSON已经解析完毕，缺少']'或'}'等字符作为JSON结尾。");
             }
         } else {
+            int start = Math.max(0, curent - 20);
+            int count = Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[curent - start];
+            Arrays.fill(chars, ' ');
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, count) + "\n" +
+                    str + "^\n" +
                     "message:在解析一个JSON中的空值时，发现它虽然是以n开头，但却不是null，不是一个合法的JSON类型。");
         }
         return null;
@@ -255,14 +281,21 @@ public class MyJsonObject {
      * 数组内部只能存储java定义的类型 <br/>
      * （byte，Byte，short，Short，int，Integer，long，Long，BigInteger，float，Float，double，Double，BigDecimal）
      */
-    private Object analyseArray(Class tClass) throws JsonFormatException, InvocationTargetException, InstantiationException, NotSupportedNumberTypeException, IllegalAccessException, NotMemberException, NotSupportedObjectArrayException, NotSupportTypeException {
+    private Object analyseArray(Class tClass) throws JsonFormatException, InvocationTargetException, IllegalAccessException, NotSupportTypeException {
         String name = tClass.getSimpleName();
         if (name.contains("[")) {
             name = name.substring(0, name.indexOf('['));
             if (classTables.containsKey(name)) {
                 tClass = classTables.get(name);
             } else {
+                int start = Math.max(0, curent - 20);
+                int count = Math.min(40, beiGaoChars.length - curent + 5);
+                char[] chars = new char[curent - start];
+                Arrays.fill(chars, ' ');
+                String str = String.valueOf(chars);
                 throw new NotSupportTypeException("index" + curent + "\n" +
+                        String.valueOf(beiGaoChars, start, count) + "\n" +
+                        str + "^\n" +
                         "message:在解析JSON时，不支持这种类型的数组。");
             }
         }
@@ -281,7 +314,14 @@ public class MyJsonObject {
                 old = beiGaoChars[curent++];
             } else if (beiGaoChars[curent] == ']') {
                 if (old == '[') {
+                    int start = Math.max(0, curent - 20);
+                    int count = Math.min(40, beiGaoChars.length - curent + 5);
+                    char[] chars = new char[curent - start];
+                    Arrays.fill(chars, ' ');
+                    String str = String.valueOf(chars);
                     throw new JsonFormatException("index" + curent + "\n" +
+                            String.valueOf(beiGaoChars, start, count) + "\n" +
+                            str + "^\n" +
                             "message:在解析JSON的一个数组时，发现它是空数组[]。");
                 }
                 stack.pop();
@@ -313,7 +353,14 @@ public class MyJsonObject {
             }
         }
         if (stack.size() != 1) {
+            int start = Math.max(0, curent - 20);
+            int count = Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[curent - start];
+            Arrays.fill(chars, ' ');
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, count) + "\n" +
+                    str + "^\n" +
                     "message:在解析一个JSON中的一个数组时，发现异常，'['和']'的数量不匹配。");
         }
         int end = 256;
@@ -352,21 +399,24 @@ public class MyJsonObject {
      * 功能描述： <br/>
      * 接下来的将会解析一个JOSN形式的对象。
      */
-    private Object analyseObject(Class tClass) throws IllegalAccessException, InstantiationException, JsonFormatException, InvocationTargetException, NotSupportedNumberTypeException, NotMemberException, NotSupportedObjectArrayException, NotSupportTypeException {
+    private Object analyseObject(Class tClass) throws IllegalAccessException, InstantiationException, JsonFormatException, InvocationTargetException, NotSupportTypeException {
         //预处理tClass中的set方法
         Hashtable<String, Method> hashtable = new Hashtable<>();
         Method[] methods = tClass.getMethods();
         for (Method method : methods) {
-            String name = method.getName();;
+            String name = method.getName();
             if (name.startsWith("set") && method.getParameterCount() == 1) {
                 char[] chars = name.substring(3).toCharArray();
-                if (chars.length > 0 && Character.isUpperCase(chars[0])) {
+                if (beiGaoChars.length > 2 &&
+                        Character.isUpperCase(chars[0]) &&
+                        (Character.isDigit(chars[1]) ||
+                                Character.isLowerCase(chars[1]) ||
+                                chars[1] == '_')) {
                     chars[0] = Character.toLowerCase(chars[0]);
-                    String key = String.valueOf(chars);
-                    if (!hashtable.containsKey(key)) {
-                        hashtable.put(key, method);
-                    }
                 }
+
+                String key = String.valueOf(chars);
+                hashtable.put(key, method);
             }
         }
         Object obj = tClass.newInstance();
@@ -382,7 +432,14 @@ public class MyJsonObject {
             clearSplitChars();
             if (curent >= beiGaoChars.length ||
                     beiGaoChars[curent] != ':') {
+                int start = Math.max(0, curent - 20);
+                int count = Math.min(40, beiGaoChars.length - curent + 5);
+                char[] chars = new char[curent - start];
+                Arrays.fill(chars, ' ');
+                String str = String.valueOf(chars);
                 throw new JsonFormatException("index" + curent + "\n" +
+                        String.valueOf(beiGaoChars, start, count) + "\n" +
+                        str + "^\n" +
                         "messages:在解析一个JSON中的一个键值对（key：value）时，发现没有键与值中间没有分隔符‘:’。");
             } else {
                 ++curent;
@@ -396,23 +453,51 @@ public class MyJsonObject {
                     if (classTables.containsKey(name)) {
                         t = classTables.get(name);
                     } else {
+                        int start = Math.max(0, curent - 20);
+                        int count = Math.min(40, beiGaoChars.length - curent + 5);
+                        char[] chars = new char[curent - start];
+                        String str = String.valueOf(chars);
                         throw new NotSupportTypeException("index:" + curent + "\n" +
+                                String.valueOf(beiGaoChars, start, count) + "\n" +
+                                str + "^\n" +
                                 "message:在解析JSON的一对键值对（key：value）的值时，发现它是一个数组，但不支持这种类型的数组\n");
                     }
                 }
                 Object o2 = analyKeyValue(t);
                 method.invoke(obj, o2);
             } else {
-                Logger logger = Logger.getLogger("解析JSON：");
-                logger.info("在解析JSON时，忽略了属性" + keyName + ",因为没有找到对应的set方法注入。");
+                int start = Math.max(0, curent - 20);
+                int count = Math.min(40, beiGaoChars.length - curent + 5);
+                char[] chars = new char[curent - start];
+                String str = String.valueOf(chars);
+                String message = "index:" + curent + "\n" +
+                        String.valueOf(beiGaoChars, start, count) + "\n" +
+                        str + "^\n" +
+                        "message:在解析JSON的一对键值对（key：value）的值时，没有找到属性" + keyName + "的set方法进行注入\n";
+
+                Enumeration<Method> elements = hashtable.elements();
+                message += "所有找到的set方法：\n";
+                while (elements.hasMoreElements()) {
+                    Method method1 = elements.nextElement();
+                    message += method1.getName() + "\n";
+                }
+                throw new NotSupportTypeException(message);
             }
         } while (true);
+
         clearSplitChars();
         if (curent < beiGaoChars.length &&
                 beiGaoChars[curent] == '}') {
+            ++curent;
             return obj;
         } else {
+            int start = Math.max(0, curent - 20);
+            int count = Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[curent - start];
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start,  count) + "\n" +
+                    str + "^\n" +
                     "message:在解析一个JSON的对象时，发现它没有以字符'}'结尾。");
         }
     }
@@ -431,17 +516,28 @@ public class MyJsonObject {
      * 功能描述： <br/>
      * 解析一个键值对（key：value）的值。
      */
-    private Object analyKeyValue(Class tClass) throws JsonFormatException, IllegalAccessException, InvocationTargetException, InstantiationException, NotSupportedNumberTypeException, NotMemberException, NotSupportedObjectArrayException, NotSupportTypeException {
+    private Object analyKeyValue(Class tClass) throws JsonFormatException, IllegalAccessException, InvocationTargetException {
         clearSplitChars();
         if (curent >= beiGaoChars.length) {
+            int start = Math.max(0, curent - 20);
+            int count =  Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[curent - start];
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, count) + "\n" +
+                    str + "^\n" +
                     "message:在解析一个JSON中的一个键值对（key：value）的值（value）之前，JSON就已经被解析完毕，缺少一些JSON结尾标志字符，比如']'或'}'\n");
         }
         if (analyKeyValueTable.containsKey(beiGaoChars[curent])) {
             Method method = analyKeyValueTable.get(beiGaoChars[curent]);
             return method.invoke(this, tClass);
         } else {
+            int start = Math.max(0, curent - 20);
+            int count =  Math.min(40, beiGaoChars.length - curent + 5);
+            char[] chars = new char[curent - start];
+            String str = String.valueOf(chars);
             throw new JsonFormatException("index:" + curent + "\n" +
+                    String.valueOf(beiGaoChars, start, count) + "\n" +
                     "message:在解析JSON一个键值对（key：value）中的值（value）时，发现它不是JSON支持的类型\n");
         }
     }
@@ -450,7 +546,7 @@ public class MyJsonObject {
      * 功能描述： <br/>
      * 解析一个json，转变为tClass类型的对象。
      */
-    public Object toPojo(String json, Class tClass) throws InvocationTargetException, InstantiationException, JsonFormatException, NotSupportedNumberTypeException, IllegalAccessException, NotMemberException, NotSupportedObjectArrayException, NotSupportTypeException {
+    public Object toPojo(String json, Class tClass) throws InvocationTargetException, InstantiationException, JsonFormatException, IllegalAccessException, NotSupportTypeException {
         beiGaoChars = json.toCharArray();
         curent = 0;
         return analyseObject(tClass);
@@ -460,7 +556,7 @@ public class MyJsonObject {
      * 功能描述：  <br/>
      * 解析一个json，转变为tClass类型的数组。
      */
-    public Object toArray(String json, Class tClass) throws IllegalAccessException, InstantiationException, JsonFormatException, NotSupportedNumberTypeException, InvocationTargetException, NotMemberException, NotSupportedObjectArrayException, NotSupportTypeException {
+    public Object toArray(String json, Class tClass) throws IllegalAccessException, JsonFormatException, InvocationTargetException, NotSupportTypeException {
         beiGaoChars = json.toCharArray();
         curent = 0;
         return analyseArray(tClass);
