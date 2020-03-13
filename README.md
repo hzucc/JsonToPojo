@@ -1,4 +1,4 @@
-# MyUtil
+# JsonToPojo
 我的javaUtil包
 
 MyJsonObject工具类:将一个JSON字符串转换成为PoJo（java对象）或转换为java数组。
